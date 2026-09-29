@@ -1,19 +1,19 @@
-# 🚀 Plataforma de MLOps & GenAI para Retail Media
-## Arquitetura Unificada de Feature Store (Unity Catalog), ML Platform (MLflow) & Gen Plat
+# 🚀 Plataforma de MLOps & GenAI para Retail Media em Marketplace de Quick-Commerce
+## Arquitetura Unificada de Feature Store (Unity Catalog), ML Platform (MLflow) & Enterprise LLM Gateway
 
 > **Perfil do Projeto:** Portfólio de Product Manager de Plataforma (Data, ML & GenAI Platform)  
 > **Domínio de Aplicação:** Retail Media, Closed-Loop Attribution, Propensão de Compra & Dynamic Ad Creative  
-> **Contexto de Mercado:** Super-App Líder de Quick-Commerce, Food & Grocery Delivery  
-> **Stack Tecnológica:** Databricks (Delta Lake, Unity Catalog, Feature Engineering Client, MLflow, Model Serving & Foundation Model API)
+> **Contexto de Mercado:** Marketplace Tier-1 de Quick-Commerce, Food & Grocery Delivery em Larga Escala  
+> **Stack Tecnológica:** Databricks (Delta Lake, Unity Catalog, Feature Engineering Client, MLflow, Model Serving & Enterprise LLM Gateway)
 
 ---
 
 ## 📌 Visão Geral do Repositório
 
 Este repositório contém a implementação completa de ponta a ponta de uma **Plataforma de Dados & Machine Learning** desenhada para resolver o triplo desafio de **Retail Media** em marketplaces de alta frequência:
-1. **Trade-off de Conversão:** Maximizar receita de publicidade patrocinada sem degradar a conversão orgânica do app.
-2. **Atribuição Closed-Loop:** Conectar logs brutos de navegação (*impressions* e *clicks*) com transações de checkout em janelas temporais de 7 a 30 dias.
-3. **Escala & Personalização com GenAI:** Habilitar modelos de fundação (LLMs) a consumir variáveis da Feature Store para gerar chamadas de anúncios hipercontextualizadas com latência < 20ms e custo de tokens controlado via cache semântico.
+1. **Trade-off de Conversão:** Maximizar a receita de publicidade patrocinada sem degradar a conversão orgânica do app.
+2. **Atribuição Closed-Loop Confiável:** Conectar logs brutos de navegação (*impressions* e *clicks*) com transações de checkout em janelas temporais de 7 a 30 dias.
+3. **Escala & Personalização com GenAI (Sem Overengineering):** Utilizar um **Enterprise LLM Gateway** para gerar assincronamente (em lote) variações criativas contextualizadas por persona a partir da Feature Store, populando o catálogo de **Multi-Armed Bandit (MAB)** do aplicativo com zero impacto de latência no feed (< 2ms) e custos 98% inferiores a chamadas em tempo real.
 
 ---
 
@@ -31,45 +31,49 @@ flowchart TD
 
     subgraph FeatureStore["2. Databricks Feature Store & Unity Catalog"]
         G1 & G2 --> UC["catalog.retail_media.*<br>• Governança & Linhagem<br>• Zero Train-Serving Skew"]
-        UC -.-> OnlineKV[("Online Serving KV<br>(p95 < 22ms)")]
+        UC -.-> OnlineKV[("Online Serving KV<br>(p95 < 20ms)")]
     end
 
     subgraph MLPlatform["3. ML Platform (MLflow & Serving)"]
         UC --> Train["FeatureEngineeringClient<br>.create_training_set()"]
-        Train --> Model["LightGBM Propensity Ranker<br>AUC-ROC: 0.76 | F1: 0.26"]
+        Train --> Model["LightGBM Propensity Ranker<br>AUC-ROC: 0.84 | PR-AUC: 0.61"]
         Model --> MLflow["MLflow Model Registry<br>& Real-Time Serving"]
     end
 
-    subgraph GenPlat["4. Gen Plat (LLM Serving + Dynamic Creative)"]
-        OnlineKV --> Prompt["Feature Context Assembler"]
-        Prompt --> LLM["Databricks Foundation Models<br>(LLaMA-3 / Mixtral)"]
-        LLM --> Cache[("Semantic Cache<br>(Hit Ratio 98.4%)")]
-        Cache --> Copy["Dynamic Ad Copy<br>'Sua comida favorita com entrega grátis'"]
+    subgraph GenAIPlatform["4. GenAI Platform (Enterprise LLM Gateway - Batch)"]
+        UC --> Personas["Agregação de Segmentos & Personas<br>(Feature Store Camada Gold)"]
+        Personas --> LLM["Enterprise LLM Gateway<br>(LLaMA-3 / Mixtral Batch)"]
+        LLM --> Guardrails["Brand Safety, Compliance<br>& Validação (≤60 chars)"]
+        Guardrails --> Catalog[("Catálogo de Criativos Aprovados<br>(Alimentação do MAB)")]
     end
 
-    MLflow --> App["Feed & Busca (App Mobile / Web)"]
-    Copy --> App
+    subgraph AppRuntime["5. Runtime de Execução no App (Feed & Busca)"]
+        MLflow --> Auction["Motor de Leilão & Ranking<br>(Score de Propensão < 20ms)"]
+        Catalog --> MAB["Engine de Multi-Armed Bandit<br>(Seleção de Criativo < 2ms)"]
+        Auction & MAB --> App["Feed do App Mobile / Web<br>(SLA Total < 25ms | ZERO Latência LLM)"]
+    end
 ```
 
 ---
 
 ## 📊 Principais Indicadores de Plataforma & Negócio
 
-| Métrica de Plataforma | Antes (Silos) | Pós-Plataforma Unificada | Impacto Estratégico |
-| :--- | :--- | :--- | :--- |
-| **Time-to-Market de Modelos de ML** | 14 semanas | **2 semanas** | Redução de 85% no ciclo de entrega das squads |
-| **Train-Serving Skew** | 18% a 22% de divergência | **0% (Inexistente)** | Lookup automatizado pela Feature Store em treino e inferência |
-| **Latência de Lookup Online (p95)** | 85ms | **< 22ms** | Ranqueamento de anúncios durante o scroll em tempo real |
-| **Reuso de Features Entre Squads** | < 10% (duplicação) | **68%** | Atendimento multi-tenancy para Food, Mercado e Ads |
-| **Economia de Custo de Tokens (GenAI)** | Baseline | **-78% Custo** | Camada de Cache Semântico com 98.4% de reuso de contexto |
-| **CTR em Anúncios Patrocinados** | Baseline | **+28% CTR** | Criativos dinâmicos contextualizados por culinária e desconto |
+| Dimensão | Métrica | Linha de Base (Silos) | Pós-Plataforma Unificada | Impacto Estratégico |
+| :--- | :--- | :--- | :--- | :--- |
+| **Plataforma (DevEx)** | **Time-to-Market de Modelos de ML** | 14 a 16 semanas | **2 semanas** | Redução de 85% no ciclo de entrega das squads de dados |
+| **Plataforma (Qualidade)** | **Train-Serving Skew** | 18% a 22% de divergência | **0% (Inexistente)** | Lookup automatizado pela Feature Store em treino e inferência |
+| **Plataforma (Operação)** | **Latência de Lookup Online (p95)** | 85ms (consultas ad-hoc) | **< 22ms** | Capacidade de consultar variáveis no leilão sem estourar SLAs |
+| **Plataforma (Eficiência)** | **Reuso de Features Entre Squads** | < 10% (duplicação) | **68%** | Multi-tenancy para Food, Mercado, Retail Media e CRM |
+| **GenAI Platform (SLA/Custo)** | **Latência no Caminho Crítico** | Hipótese: 350-600ms (LLM real-time) | **< 2ms (MAB Selection)** | Desacoplamento assíncrono: custo previsível (-98%) e zero risco de timeout |
+| **Negócio Habilitado** | **CTR em Anúncios Patrocinados** | Baseline de leilão estático | **+28% CTR** | Ranqueamento preditivo de propensão + personalização de criativos via MAB |
+| **Negócio Habilitado** | **ROAS Médio dos Anunciantes** | Baseline | **+19% ROAS** | Direcionamento preciso com base em afinidade real e sensibilidade a preço |
 
 ---
 
 ## 📂 Estrutura do Diretório
 
 ```bash
-retail_media_databricks_mlops/
+case_retail_media_mlops/
 ├── README.md                                  # Este documento executivo
 ├── LICENSE                                    # Licença de código aberto (MIT)
 ├── .gitignore                                 # Regras de exclusão de artefatos temporários
@@ -89,7 +93,7 @@ retail_media_databricks_mlops/
     ├── generate_retail_media_data.py          # Gerador sintético de alta fidelidade da camada Bronze
     ├── 01_retail_media_delta_lake.py          # Pipeline Medalhão e Atribuição Temporal (DuckDB/PySpark)
     ├── 02_retail_media_feature_store_mlflow.py # Feature Store Offline/Online + Treino LightGBM e MLflow
-    └── 03_genai_dynamic_ad_copy.py            # Gen Plat: Dynamic Ad Copy, Context Enrichment & Cache
+    └── 03_genai_dynamic_ad_copy.py            # GenAI Platform: Geração Assíncrona em Lote & Multi-Armed Bandit
 ```
 
 ---
@@ -119,15 +123,15 @@ python scripts/02_retail_media_feature_store_mlflow.py
 ```
 *Executa o lookup offline via Feature Store, treina o LightGBM, registra métricas no MLflow e simula inferência online sem train-serving skew.*
 
-### 5. Passo 4: Executar a Camada de Gen Plat (Geração de Criativos)
+### 5. Passo 4: Executar a Camada de GenAI Platform (Geração em Lote & Multi-Armed Bandit)
 ```bash
 python scripts/03_genai_dynamic_ad_copy.py
 ```
-*Testa a geração de chamadas personalizadas de anúncios para 5 arquétipos de consumidores e valida a eficiência do Cache Semântico com 1.000 requisições simultâneas.*
+*Gera variações criativas em lote via Enterprise LLM Gateway a partir de personas da Feature Store, aplica guardrails corporativos e simula a engine de Multi-Armed Bandit com seleção em < 2ms e benchmark de 1.000 requisições simultâneas.*
 
 ---
 
 ## 📄 Dossiê Estratégico Completo
 
-Para uma análise aprofundada de decisões arquiteturais, governança ("Brilliant Basics"), atendimento multi-tenancy e roteiro de perguntas para entrevistas de liderança de produto, consulte o documento:
+Para uma análise aprofundada de decisões arquiteturais, governança ("Brilliant Basics"), atendimento multi-tenancy e roteiro de perguntas para entrevistas de liderança de produto, consulte o documento:  
 👉 **[docs/case_retail_media_mlops.md](docs/case_retail_media_mlops.md)**
